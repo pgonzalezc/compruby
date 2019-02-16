@@ -1,7 +1,7 @@
 module IBAN
 	$desc_parts = {
 		'k' => 'check_digits',
-		'b' => 'bank_account',
+		'b' => 'bank_code',
 		's' => 'branch_code',
 		'c' => 'account_number',
 		'x' => 'national_check_digits',
@@ -10,7 +10,7 @@ module IBAN
 		't' => 'account_type',
 		'i' => 'Account_holder',
 		'0' => 'zeroes',
-		'a' => 'balance_acount_number'
+		'a' => 'balance_account_number'
 	}
 	
 	module CountryFactory
@@ -29,7 +29,6 @@ module IBAN
 			countries
 		end
 		
-		private
 		def CountryFactory.get_sections(from)
 			idx = 0
 			start = from[0]
@@ -49,86 +48,56 @@ module IBAN
 		def CountryFactory.sections_to_regexp(country,sections)
 			Regexp.new(sections.inject(country.to_s) do |res,assoc|
 				letra,longitud = *assoc
-				res + "(?'#{$desc_parts[letra]}'\\d{#{longitud}})"
+				res + "(?'#{$desc_parts[letra]}'\\w{#{longitud}})"
 			end)
 		end #sections_to_regexp
+	end #CountryFactory
+	
+	def self.countries
+		CountryFactory.get
 	end
+	
+	class Iban
+		attr_reader :country
+		
+		def initialize(iban_str)
+			parts = /([A-Z]{2})(.+)/.match(iban_str)
+			@country = parts[1]
+			@rest = parts[2]
+			
+			parts = IBAN::countries[@country].match(iban_str)
+			
+			raise 'invalid iban, bad pattern for country [#{@country}]' unless parts
+			
+			info_empty = $desc_parts.values.difference(parts.names).map do |name|
+				[name,""]
+			end
+			info_iban = parts.names.zip(parts.captures) 
+			info_iban.concat(info_empty).each do |name,value|
+				define_singleton_method(name.to_sym) do 
+					value
+				end
+			end
+			
+			raise 'invalid iban, can''t validate check digits' unless 
+				validate_check_digits(@country,@rest)
+		end #initialize
+		
+		def to_s
+			"#{@country}#{@rest}"
+		end
+		
+		private 
+		def validate_check_digits(country,rest)
+			# reorder charcter of iban string.
+			check_digits = rest[0,2]
+			bban = rest[2..]
+			
+			(bban + country + check_digits).upcase.chars.inject("") do |t,c|
+				t + (((c >= '0') && (c <= '9')) ? c : ((c.ord - ?A.ord) + 10).to_s)
+			end.to_i % 97 == 1
+			
+		end #validate_check_digits
+	end #Iban
 
 end #module IBAN
-
-include IBAN
-
-$stdout << CountryFactory.get['ES'].source << "\n"
-
-
-__END__
-ALkk bbbs sssx cccc cccc cccc cccc
-ADkk bbbb ssss cccc cccc cccc
-ATkk bbbb bccc cccc cccc
-AZkk bbbb cccc cccc cccc cccc cccc
-BHkk bbbb cccc cccc cccc cc
-BYkk bbbb aaaa cccc cccc cccc cccc
-BEkk bbbc cccc ccxx
-BAkk bbbs sscc cccc ccxx
-BRkk bbbb bbbb ssss sccc cccc ccct n
-BGkk bbbb ssss ttcc cccc cc
-CRkk 0bbb cccc cccc cccc cc
-HRkk bbbb bbbc cccc cccc c
-CYkk bbbs ssss cccc cccc cccc cccc
-CZkk bbbb ssss sscc cccc cccc
-DKkk bbbb cccc cccc cc
-DOkk bbbb cccc cccc cccc cccc cccc
-TLkk bbbc cccc cccc cccc cxx
-EEkk bbss cccc cccc cccx
-FOkk bbbb cccc cccc cx
-FIkk bbbb bbcc cccc cx
-FRkk bbbb bsss sscc cccc cccc cxx
-GEkk bbcc cccc cccc cccc cc
-DEkk bbbb bbbb cccc cccc cc
-GIkk bbbb cccc cccc cccc ccc
-GRkk bbbs sssc cccc cccc cccc ccc
-GLkk bbbb cccc cccc cc
-GTkk bbbb mmtt cccc cccc cccc cccc
-HUkk bbbs sssx cccc cccc cccc cccx
-ISkk bbbb sscc cccc iiii iiii ii
-IEkk aaaa bbbb bbcc cccc cc
-ILkk bbbn nncc cccc cccc ccc
-ITkk xbbb bbss sssc cccc cccc ccc 
-JOkk bbbb ssss cccc cccc cccc cccc cc
-KZkk bbbc cccc cccc cccc
-XKkk bbbb cccc cccc cccc
-KWkk bbbb cccc cccc cccc cccc cccc cc
-LVkk bbbb cccc cccc cccc c
-LBkk bbbb cccc cccc cccc cccc cccc
-LIkk bbbb bccc cccc cccc c
-LTkk bbbb bccc cccc cccc
-LUkk bbbc cccc cccc cccc
-MKkk bbbc cccc cccc cxx
-MTkk bbbb ssss sccc cccc cccc cccc ccc
-MRkk bbbb bsss sscc cccc cccc cxx
-MUkk bbbb bbss cccc cccc cccc 000m mm
-MCkk bbbb bsss sscc cccc cccc cxx
-MDkk bbcc cccc cccc cccc cccc
-MEkk bbbc cccc cccc cccc xx
-NLkk bbbb cccc cccc cc
-NOkk bbbb cccc ccx
-PKkk bbbb cccc cccc cccc cccc
-PSkk bbbb xxxx xxxx xccc cccc cccc c
-PLkk bbbs sssx cccc cccc cccc cccc
-PTkk bbbb ssss cccc cccc cccx x
-QAkk bbbb cccc cccc cccc cccc cccc c
-ROkk bbbb cccc cccc cccc cccc
-SMkk xbbb bbss sssc cccc cccc ccc
-SAkk bbcc cccc cccc cccc cccc
-RSkk bbbc cccc cccc cccc xx
-SKkk bbbb ssss sscc cccc cccc
-SIkk bbss sccc cccc cxx
-ESkk bbbb ssss xxcc cccc cccc
-SEkk bbbc cccc cccc cccc cccc
-CHkk bbbb bccc cccc cccc c
-TNkk bbss sccc cccc cccc cccc
-TRkk bbbb bxcc cccc cccc cccc cc
-AEkk bbbc cccc cccc cccc ccc
-GBkk bbbb ssss sscc cccc cc
-VAkk bbbc cccc cccc cccc cc
-VGkk bbbb cccc cccc cccc cccc
