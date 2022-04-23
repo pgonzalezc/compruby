@@ -1,3 +1,5 @@
+# Modulo IBAN creador de las factorias para los diferentes
+# tipo de IBAN segun el país.
 module IBAN
 	$desc_parts = {
 		'k' => 'check_digits',
